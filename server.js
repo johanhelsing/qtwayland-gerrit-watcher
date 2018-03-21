@@ -11,8 +11,9 @@ emitter.on('patchsetCreated', function(data) {
     }
 
     console.log(`Detected new patch set in ${project} by ${owner}: ${subject}`);
-    const qtWaylandRev = patchSet.revision;
-    const command = `docker run -e QT_DOCKERTEST_QTWAYLAND_REF=${qtWaylandRev} qtbuilder-stretch`;
+    const qtWaylandRev = "5.11"; //patchSet.revision;
+    const qt5Rev = "5.11";
+    const command = `docker run -e QT_DOCKERTEST_QTWAYLAND_REV=${qtWaylandRev} -e QT_DOCKERTEST_QT5_REV=${qt5Rev} qtbuilder-stretch`;
     console.log(`Starting test "${command}"`);
     exec(command, (err, stdout, stderr) => {
         console.log('Testing finished');
