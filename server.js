@@ -1,24 +1,36 @@
 const GerritEventEmitter = require('gerrit-event-emitter').GerritEventEmitter;
-const emitter = new GerritEventEmitter('codereview.qt-project.org', 29418);
+const emitter = new GerritEventEmitter('codereview.qt-project.org');
 const { exec } = require("child_process");
 
-emitter.on('patchsetCreated', function(data) {
+emitter.on('patchsetCreated', data => {
     const { change, patchSet } = data;
-    const { owner, project, subject } = change;
+    const { project, subject, branch, url } = change;
 
+    //if (!project.startsWith('qt/')) {
     if (project !== 'qt/qtwayland') {
         return;
     }
 
-    console.log(`Detected new patch set in ${project} by ${owner}: ${subject}`);
-    const qtWaylandRev = "5.11"; //patchSet.revision;
-    const qt5Rev = "5.11";
-    const command = `docker run -e QT_DOCKERTEST_QTWAYLAND_REV=${qtWaylandRev} -e QT_DOCKERTEST_QT5_REV=${qt5Rev} qtbuilder-stretch`;
-    console.log(`Starting test "${command}"`);
+    const prefix = `${url} #${patchSet.number} (${branch}) - ${subject} -`;
+    //const prefix = `[${project}] ${url} #${patchSet.number} (${branch}) - ${subject} -`;
+
+    console.log(prefix, 'STARTING TEST');
+
+    const qtWaylandRev = patchSet.ref;
+    const qt5Rev = branch;
+    const command = `docker run -e QT_DOCKERTEST_QTWAYLAND_REV=${qtWaylandRev} -e QT_DOCKERTEST_QT5_REV=${qt5Rev} --name gerrit-watcher-${change.number}-${patchSet.number} qtbuilder-stretch`;
+    console.log(prefix, command);
     exec(command, (err, stdout, stderr) => {
-        console.log('Testing finished');
-        console.log(err ? 'Failure :(' : 'Great success :D');
+        if (err) {
+            console.log(prefix, 'FAILED');
+            console.log(stderr);
+        } else {
+            console.log(prefix, 'PASSED');
+        }
     });
 });
 
+emitter.on('gerritStreamEnd', () => emitter.start());
+
+console.log("Starting gerrit-watcher");
 emitter.start();
