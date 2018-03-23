@@ -12,7 +12,9 @@
     "eslint-plugin-standard": "^3.0.1"
   },
   "dependencies": {
+    "express": "^4.16.3",
     "gerrit-event-emitter": "^0.1.5",
-    "lodash": "^4.17.5"
+    "lodash": "^4.17.5",
+    "serve-index": "^1.9.1"
   }
 }
