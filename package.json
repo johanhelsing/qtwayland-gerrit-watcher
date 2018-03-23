@@ -12,6 +12,7 @@
     "eslint-plugin-standard": "^3.0.1"
   },
   "dependencies": {
-    "gerrit-event-emitter": "^0.1.5"
+    "gerrit-event-emitter": "^0.1.5",
+    "lodash": "^4.17.5"
   }
 }
