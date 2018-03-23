@@ -6,7 +6,25 @@ const fs = require('fs');
 const express = require('express');
 const serveIndex = require('serve-index');
 
+const gerritHost = 'codereview.qt-project.org';
+const gerritSshPort = 29418;
+
 const tests = [];
+
+const testsFilePath = 'logs/results.json';
+function restoreTests() {
+    if (!fs.existsSync(testsFilePath)) return;
+    JSON.parse(fs.readFileSync(testsFilePath)).map(test => {
+        if (test.status === 'running') test.status = 'unknown';
+        tests.push(test);
+    });
+}
+
+function saveTests() {
+    fs.writeFile(testsFilePath, JSON.stringify(tests), err => {
+        if (err) throw err;
+    });
+}
 
 function startDockerTest(test, callback) {
     test.title = test.title || test.containerName;
@@ -19,12 +37,14 @@ function startDockerTest(test, callback) {
     const command = `docker run ${envArgs} --name ${containerName} qtbuilder-stretch`;
     const args = [].concat(['run', '--name', containerName], envArgs, ['qtbuilder-stretch']);
     console.log('docker ' + args.join(' '));
-    test.process = spawn('docker', args);
+    const testProcess = spawn('docker', args);
     test.status = 'running';
+
     const logFile = fs.createWriteStream(`logs/${containerName}.txt`);
-    test.process.stdout.pipe(logFile);
-    test.process.stderr.pipe(logFile);
-    test.process.on('close', code => {
+    testProcess.stdout.pipe(logFile);
+    testProcess.stderr.pipe(logFile);
+
+    testProcess.on('close', code => {
         if (code != 0) {
             console.log(title, "Failed: with code", code);
             test.status = 'failed';
@@ -32,13 +52,34 @@ function startDockerTest(test, callback) {
             console.log(title, 'Passed');
             test.status = 'passed';
         }
+        saveTests();
     });
+
     tests.push(test);
-    return test;
+    saveTests();
+    return testProcess;
+}
+
+function postGerritComment(commit, comment, codeReview) {
+    const args = ['-p', gerritSshPort, gerritHost, 'gerrit', 'review', '-m', `"${comment}"`, commit];
+    if (codeReview) {
+        args.push('--code-review', codeReview);
+    }
+    console.log('ssh', args.join('\n'));
+    const p = spawn('ssh', args);
+    p.stdout.on('data', data => console.log(data));
+    p.stderr.on('data', data => console.log(data));
+    p.on('close', code => {
+        if (code != 0) {
+            console.log(`Couldn't post gerrit comment, return code ${code}`);
+        } else {
+            console.log(`Posted gerrit comment on ${commit}`);
+        }
+    });
 }
 
 function listenForGerritChanges() {
-    const emitter = new GerritEventEmitter('codereview.qt-project.org');
+    const emitter = new GerritEventEmitter(gerritHost);
     emitter.on('patchsetCreated', data => {
         const { change, patchSet } = data;
         const { project, subject, branch, url } = change;
@@ -57,8 +98,17 @@ function listenForGerritChanges() {
         const qtWaylandRev = patchSet.ref;
         const qt5Rev = branch;
         const containerName = `gerrit-watcher-${change.number}-${patchSet.number}`;
+
         console.log(prefix, 'Starting test');
-        startDockerTest(test);
+        const testProcess = startDockerTest(test);
+
+        testProcess.on('close', code => {
+            const commit = `${change.number},${patchSet.number}`;
+            const message = 'Experimental QtWayland Bot: ';
+            message += `Running headless tests ${commit} ${code ? 'failed' : 'succeeded'}`;
+            const codeReview = code && '-1';
+            postGerritComment(commit, message, codeReview);
+        });
     });
 
     emitter.on('gerritStreamEnd', () => emitter.start());
@@ -83,11 +133,11 @@ function testsPage(tests) {
             <h1>${title}</h1>
             <p><a href="logs/">Browse logs</a></p>
             <ul>
-                ${tests.map(test => `
+                ${tests.slice(0).reverse().map(test => `
                     <li class="${test.status}">
                         ${test.title} -
-                        qt5: ${test.qt5Rev} -
-                        qtwayland: ${test.qtWaylandRev} -
+                        Qt: ${test.qt5Rev} -
+                        QtWayland: ${test.qtWaylandRev} -
                         ${test.status} - 
                         ${test.url ? `<a href="${test.url}">${test.url}</a> - ` : ''}
                         <a href="logs/${test.containerName}.txt">log</a>
@@ -116,6 +166,7 @@ if (!fs.existsSync('logs')){
     fs.mkdirSync('logs');
 }
 
+restoreTests();
 listenForGerritChanges();
 initTest();
 serveLogs();
