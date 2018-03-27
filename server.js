@@ -11,11 +11,16 @@ const gerritSshPort = 29418;
 
 const tests = [];
 
+function unixTimeStamp() {
+    return Math.floor(new Date() / 1000);
+}
+
 const testsFilePath = 'logs/results.json';
 function restoreTests() {
     if (!fs.existsSync(testsFilePath)) return;
+    fs.copyFileSync(testsFilePath, `${testsFilePath}.bak-${unixTimeStamp()}`);
     JSON.parse(fs.readFileSync(testsFilePath)).map(test => {
-        if (test.status === 'running') test.status = 'unknown';
+        if (test.status === 'running') test.status = 'aborted';
         tests.push(test);
     });
 }
@@ -88,6 +93,10 @@ function listenForGerritChanges() {
             return;
         }
 
+        const qtWaylandRev = patchSet.ref;
+        const qt5Rev = branch;
+        const containerName = `gerrit-watcher-${change.number}-${patchSet.number}`;
+
         const test = {
             qtWaylandRev,
             qt5Rev,
@@ -95,17 +104,14 @@ function listenForGerritChanges() {
             title: `Change ${change.number} patch set #${patchSet.number} (${branch}) - ${subject} -`,
             url
         };
-        const qtWaylandRev = patchSet.ref;
-        const qt5Rev = branch;
-        const containerName = `gerrit-watcher-${change.number}-${patchSet.number}`;
 
-        console.log(prefix, 'Starting test');
+        console.log('Starting test', test);
         const testProcess = startDockerTest(test);
 
         testProcess.on('close', code => {
             const commit = `${change.number},${patchSet.number}`;
-            const message = 'Experimental QtWayland Bot: ';
-            message += `Running headless tests ${commit} ${code ? 'failed' : 'succeeded'}`;
+            const message = 'Experimental QtWayland Bot: ' +
+                `Running headless tests ${commit} ${code ? 'failed' : 'succeeded'}`;
             const codeReview = code && '-1';
             postGerritComment(commit, message, codeReview);
         });
@@ -127,6 +133,7 @@ function testsPage(tests) {
                 .failed { color: darkred; }
                 .passed { color: darkgreen; }
                 .running { color: darkorange; }
+                .aborted { color: gray; }
             </style>
         </head>
         <body>
@@ -158,7 +165,7 @@ function serveLogs() {
 }
 
 function initTest() {
-    const initContainerName = 'gerrit-watcher-init-test-'+Math.floor(new Date() / 1000);
+    const initContainerName = 'gerrit-watcher-init-test-'  + unixTimeStamp();
     const initTest = startDockerTest({qtWaylandRev: '5.11', qt5Rev: '5.11', containerName: initContainerName});
 }
 
