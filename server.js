@@ -5,9 +5,11 @@ const { reduce } = require('lodash');
 const fs = require('fs');
 const express = require('express');
 const serveIndex = require('serve-index');
+const { scheduleJob } = require('node-schedule');
 
 const gerritHost = 'codereview.qt-project.org';
 const gerritSshPort = 29418;
+const readLastLines = require('read-last-lines');
 
 const tests = [];
 
@@ -62,7 +64,7 @@ function startDockerTest(test, callback) {
 
     tests.push(test);
     saveTests();
-    return testProcess;
+    return testProcess; //TODO: Maybe return a promise instead?
 }
 
 function postGerritComment(commit, comment, codeReview) {
@@ -70,7 +72,7 @@ function postGerritComment(commit, comment, codeReview) {
     if (codeReview) {
         args.push('--code-review', codeReview);
     }
-    console.log('ssh', args.join('\n'));
+    console.log('ssh', args.join(' '));
     const p = spawn('ssh', args);
     p.stdout.on('data', data => console.log(data));
     p.stderr.on('data', data => console.log(data));
@@ -101,7 +103,7 @@ function listenForGerritChanges() {
             qtWaylandRev,
             qt5Rev,
             containerName,
-            title: `Change ${change.number} patch set #${patchSet.number} (${branch}) - ${subject} -`,
+            title: `Change ${change.number} patch set #${patchSet.number} (${branch}) - ${subject}`,
             url
         };
 
@@ -109,11 +111,21 @@ function listenForGerritChanges() {
         const testProcess = startDockerTest(test);
 
         testProcess.on('close', code => {
+            const failed = code != 0; //TODO: Maybe it's only for code === 2 that the test actually failed?
             const commit = `${change.number},${patchSet.number}`;
-            const message = 'Experimental QtWayland Bot: ' +
-                `Running headless tests ${commit} ${code ? 'failed' : 'succeeded'}`;
-            const codeReview = code && '-1';
-            postGerritComment(commit, message, codeReview);
+            var message = 'Experimental QtWayland Bot: ' +
+                `Running headless tests ${commit} ${failed ? 'failed' : 'succeeded'}`;
+            if (failed) {
+                const codeReview = '-1';
+                readLastLines.read(`logs/${containerName}.txt`, 10).then(lines => {
+                    const messageWithLogTail = message + lines;
+                    console.log(messageWithLogTail);
+                    //postGerritComment(commit, messageWithLogTail, codeReview);
+                    postGerritComment(commit, message, codeReview);
+                }).catch(reason => console.log('Couldn\'t get last lines of log file', reason));
+            } else {
+                postGerritComment(commit, message);
+            }
         });
     });
 
@@ -164,9 +176,10 @@ function serveLogs() {
     server.listen(8056);
 }
 
-function initTest() {
-    const initContainerName = 'gerrit-watcher-init-test-'  + unixTimeStamp();
-    const initTest = startDockerTest({qtWaylandRev: '5.11', qt5Rev: '5.11', containerName: initContainerName});
+function healthCheck(rev) {
+    const containerName = `gerrit-watcher-health-check-${rev}-${unixTimeStamp()}`
+    const title = `Health check ${rev} ${new Date().toISOString()}`;
+    startDockerTest({qtWaylandRev: rev, qt5Rev: rev, containerName, title });
 }
 
 if (!fs.existsSync('logs')){
@@ -175,5 +188,14 @@ if (!fs.existsSync('logs')){
 
 restoreTests();
 listenForGerritChanges();
-initTest();
+scheduleJob({hour: 12, minute: 0}, () => {
+    console.log('Running daily checks');
+    healthCheck('5.11');
+    healthCheck('dev');
+});
+
+// Run initial tests
+healthCheck('5.11');
+healthCheck('dev');
+
 serveLogs();
