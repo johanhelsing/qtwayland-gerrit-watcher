@@ -152,7 +152,10 @@ function testsPage(tests) {
         </head>
         <body>
             <h1>${title}</h1>
-            <p><a href="logs/">Browse logs</a></p>
+            <p>For every patch set submitted to QtWayland, all QtWayland unit tests are run plus a relevant subset of the QtBase tests. The tests run on a headless Weston instance inside a docker container.</p>
+            <p>Daily health checks are also run for some branches.</p>
+            <p><a href="https://github.com/johanhelsing/docker-qt-tests">How to run/debug these tests locally</a></p>
+            <p><a href="logs/">Browse log folder</a></p>
             <ul>
                 ${tests.slice(0).reverse().map(test => `
                     <li class="${test.status}">
