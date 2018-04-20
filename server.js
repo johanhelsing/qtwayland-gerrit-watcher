@@ -91,7 +91,7 @@ function listenForGerritChanges() {
         const { change, patchSet } = data;
         const { project, subject, branch, url } = change;
 
-        if (project !== 'qt/qtwayland') {
+        if (project !== 'qt/qtwayland' || branch === '5.9') {
             return;
         }
 
