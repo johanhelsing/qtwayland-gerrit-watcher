@@ -111,7 +111,7 @@ function listenForGerritChanges() {
         const testProcess = startDockerTest(test);
 
         testProcess.on('close', code => {
-            const failed = code != 0; //TODO: Maybe it's only for code === 2 that the test actually failed?
+            const failed = code != 0;
             const commit = `${change.number},${patchSet.number}`;
             var message = 'Experimental QtWayland Bot: ' +
                 `Running headless tests ${commit} ${failed ? 'failed' : 'succeeded'}`;
@@ -129,6 +129,7 @@ function listenForGerritChanges() {
         });
     });
 
+    // The ssh connection will sometimes disconnect us. In that case, just reconnect.
     emitter.on('gerritStreamEnd', () => emitter.start());
 
     console.log("Starting gerrit-watcher");
