@@ -113,14 +113,15 @@ function listenForGerritChanges() {
         testProcess.on('close', code => {
             const failed = code != 0;
             const commit = `${change.number},${patchSet.number}`;
-            var message = 'Experimental QtWayland Bot: ' +
-                `Running headless tests ${commit} ${failed ? 'failed' : 'succeeded'}`;
+            var message = 'Experimental QtWayland Bot: Running headless tests for change ' +
+                `${change.number}, patch set #${patchSet.number} ${failed ? 'failed' : 'succeeded'}`;
             if (failed) {
                 const codeReview = '-1';
-                readLastLines.read(`logs/${containerName}.txt`, 10).then(lines => {
-                    const messageWithLogTail = message + lines;
-                    console.log(messageWithLogTail);
-                    //postGerritComment(commit, messageWithLogTail, codeReview);
+                const tailLines = 30;
+                readLastLines.read(`logs/${containerName}.txt`, tailLines).then(lines => {
+                    const indentedLogTail = lines.replace(/^/mg, '    ');
+                    message = `${message}\n\nLast ${tailLines} lines of log:\n\n${indentedLogTail}`;
+                    console.log(message);
                     postGerritComment(commit, message, codeReview);
                 }).catch(reason => console.log('Couldn\'t get last lines of log file', reason));
             } else {
@@ -190,13 +191,16 @@ if (!fs.existsSync('logs')){
 restoreTests();
 listenForGerritChanges();
 scheduleJob({hour: 12, minute: 0}, () => {
-    console.log('Running daily checks');
-    healthCheck('5.11');
+    console.log('Running daily health check for dev');
     healthCheck('dev');
+});
+scheduleJob({hour: 11, minute: 0}, () => {
+    console.log('Running daily health check for 5.11');
+    healthCheck('5.11');
 });
 
 // Run initial tests
-healthCheck('5.11');
-healthCheck('dev');
+//healthCheck('5.11');
+//healthCheck('dev');
 
 serveLogs();
