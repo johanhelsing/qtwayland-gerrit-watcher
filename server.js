@@ -10,6 +10,7 @@ const { scheduleJob } = require('node-schedule');
 const gerritHost = 'codereview.qt-project.org';
 const gerritSshPort = 29418;
 const readLastLines = require('read-last-lines');
+const parseVersion = require('./parseVersion');
 
 const tests = [];
 
@@ -91,7 +92,13 @@ function listenForGerritChanges() {
         const { change, patchSet } = data;
         const { project, subject, branch, url } = change;
 
-        if (project !== 'qt/qtwayland' || branch === '5.9') {
+        if (project !== 'qt/qtwayland') {
+            return;
+        }
+
+        const version = parseVersion(branch);
+        // The tests are currently broken for branches prior to 5.11
+        if (version.major === 5 && version.minor < 11) {
             return;
         }
 
