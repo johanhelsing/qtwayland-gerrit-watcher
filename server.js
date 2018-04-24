@@ -122,6 +122,7 @@ function listenForGerritChanges() {
             const commit = `${change.number},${patchSet.number}`;
             var message = 'Experimental QtWayland Bot: Running headless tests for change ' +
                 `${change.number}, patch set #${patchSet.number} ${failed ? 'failed' : 'succeeded'}`;
+            message += "\n\nHow to run the tests locally: https://github.com/johanhelsing/docker-qt-tests";
             if (failed) {
                 const codeReview = '-1';
                 const tailLines = 30;
