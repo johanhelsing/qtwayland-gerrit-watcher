@@ -60,6 +60,7 @@ function startDockerTest(test, callback) {
             console.log(title, 'Passed');
             test.status = 'passed';
         }
+        spawn('docker', ['rm', containerName]); // don't leave images lying around
         saveTests();
     });
 
