@@ -202,11 +202,11 @@ if (!fs.existsSync('logs')){
 
 restoreTests();
 listenForGerritChanges();
-scheduleJob({hour: 12, minute: 0}, () => {
+scheduleJob({hour: 0, minute: 0}, () => {
     console.log('Running daily health check for dev');
     healthCheck('dev');
 });
-scheduleJob({hour: 11, minute: 0}, () => {
+scheduleJob({hour: 23, minute: 0}, () => {
     console.log('Running daily health check for 5.11');
     healthCheck('5.11');
 });
