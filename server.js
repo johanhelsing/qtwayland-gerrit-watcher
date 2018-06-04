@@ -42,8 +42,7 @@ function startDockerTest(test, callback) {
         QT_DOCKERTEST_QT5_REV: qt5Rev
     };
     const envArgs = reduce(environment, (args, value, key) => args.concat(['-e', `${key}=${value}`]), []);
-    const command = `docker run ${envArgs} --name ${containerName} qtbuilder-stretch`;
-    const args = [].concat(['run', '--name', containerName], envArgs, ['qtbuilder-stretch']);
+    const args = [].concat(['run', '--name', containerName], envArgs, ['docker-qt-tests']);
     console.log('docker ' + args.join(' '));
     const testProcess = spawn('docker', args);
     test.status = 'running';
