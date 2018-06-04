@@ -7,7 +7,7 @@ const express = require('express');
 const serveIndex = require('serve-index');
 const { scheduleJob } = require('node-schedule');
 
-const gerritHost = 'codereview.qt-project.org';
+const gerritHost = process.env.GERRIT_HOSTNAME || 'codereview.qt-project.org';
 const gerritSshPort = 29418;
 const readLastLines = require('read-last-lines');
 const parseVersion = require('./parseVersion');
