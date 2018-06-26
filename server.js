@@ -98,6 +98,11 @@ function listenForGerritChanges() {
             return;
         }
 
+        if (subject.startsWith('WIP')) {
+            console.log('Ignoring WIP change');
+            return;
+        }
+
         const version = parseVersion(branch);
         // The tests are currently broken for branches prior to 5.11
         if (version && version.major === 5 && version.minor < 11) {
