@@ -8,6 +8,7 @@ const serveIndex = require('serve-index');
 const { scheduleJob } = require('node-schedule');
 
 const gerritHost = process.env.GERRIT_HOSTNAME || 'codereview.qt-project.org';
+const ccacheVolume = process.env.CCACHE_VOLUME;
 const gerritSshPort = 29418;
 const readLastLines = require('read-last-lines');
 const parseVersion = require('./parseVersion');
@@ -42,7 +43,8 @@ function startDockerTest(test, callback) {
         QT_DOCKERTEST_QT5_REV: qt5Rev
     };
     const envArgs = reduce(environment, (args, value, key) => args.concat(['-e', `${key}=${value}`]), []);
-    const args = [].concat(['run', '--name', containerName], envArgs, ['docker-qt-tests']);
+    const ccacheArgs = ccacheVolume ? ['-v', 'ccache:/home/build/.ccache'] : [];
+    const args = [].concat(['run', '--name', containerName], ccacheArgs, envArgs, ['docker-qt-tests']);
     console.log('docker ' + args.join(' '));
     const testProcess = spawn('docker', args);
     test.status = 'running';
